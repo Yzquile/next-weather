@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getWeatherBg } from "@/utils/getWeatherBg";
+import getWeatherBg  from "@/utils/getWeatherBg";
 import { getUserLocation } from "@/utils/getUserLocation";
 import { getCurrentDate } from "@/utils/getCurrentDate";
 import Search from "./components/Search";
@@ -193,10 +193,12 @@ export default function Home() {
                         {item.dt_txt.split(" ")[1].slice(0, 5)}
                       </p>
                       <p>{item.weather[0].main}</p>
-                      <img
+                      <Image
                         src={`https://openweathermap.org/img/wn/${item.weather[0].icon}.png`}
                         alt="icon"
                         className="m-auto"
+                        width={64}
+                        height={64}
                       />
                       <small className="capitalize flex mb-4 mx-2">
                         {item.weather[0].description}
