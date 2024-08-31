@@ -1,113 +1,213 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { getWeatherBg } from "@/utils/getWeatherBg";
+import { getUserLocation } from "@/utils/getUserLocation";
+import { getCurrentDate } from "@/utils/getCurrentDate";
+import Search from "./components/Search";
 import Image from "next/image";
 
 export default function Home() {
+  const [location, setLocation] = useState(null);
+  const [weatherData, setWeatherData] = useState(null);
+  const [weatherForecast, setWeatherForecast] = useState(null);
+
+  const [search, setSearch] = useState("");
+  const [inputError, setInputError] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  //useEffect on getting user location
+  useEffect(() => {
+    getUserLocation(setLocation);
+    //getUserLocation gives the lat and lon value from the user location if not default to Cebu city
+  }, []);
+
+  //useEffect for fetching data based on location
+  useEffect(() => {
+    const fetchWeatherDataAndForecast = async () => {
+      if (location) {
+        //fetch some weather data
+        try {
+          const weatherResult = await fetch(
+            `/api/weatherData?lat=${location.lat}&lon=${location.lon}`
+          );
+          if (!weatherResult.ok) {
+            throw new Error("Failed to fetch data");
+          }
+          const weatherData = await weatherResult.json();
+          setWeatherData(weatherData);
+          setErrorMessage("");
+        } catch (error) {
+          console.error("Error fetching data", error);
+        }
+
+        //fetch weather forecast
+        try {
+          const forecastResult = await fetch(
+            `/api/weatherForecast?lat=${location.lat}&lon=${location.lon}`
+          );
+          if (!forecastResult.ok) {
+            throw new Error("Failed to fetch data");
+          }
+          const forecastData = await forecastResult.json();
+          setWeatherForecast(forecastData);
+        } catch (error) {
+          console.error("Error fetching data", error);
+        }
+      }
+    };
+    fetchWeatherDataAndForecast();
+  }, [location]);
+
+  // Handle search function
+  async function handleSearch() {
+    if (search.trim() === "") {
+      setInputError("Please input a location");
+    } else {
+      setInputError("");
+
+      try {
+        // Make the API call to your backend to get the location data
+        const locationData = await fetch(`/api/getLocation?cityName=${search}`);
+        const data = await locationData.json();
+
+        if (data.error) {
+          console.error(data.error);
+          setInputError("City not found");
+        } else {
+          const { lat, lon } = data;
+          setLocation({ lat, lon });
+        }
+      } catch (error) {
+        console.error("Error fetching location data:", error);
+        setInputError("Failed to fetch location data");
+      }
+    }
+  }
+
+  //background image function
+  //if weather[0].icon == 10d it is rainy day, if it is 10n it is rainy night
+  const bgImage = weatherData?.weather[0]?.icon
+    ? getWeatherBg(weatherData.weather[0].icon)
+    : getWeatherBg("01d");
+
+  //Getting forecast_date for Weather forecast
+  const forecast_date = weatherForecast?.list[0]?.dt_txt?.split(" ")[0];
+  const icon = weatherData?.weather[0]?.icon
+    ? `/icons/${weatherData.weather[0].icon}.svg`
+    : "";
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">app/page.js</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{" "}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
+    <section className="w-screen h-screen">
+      <div
+        className="min-h-screen min-w-screen"
+        style={{
+          backgroundImage: `url(${bgImage})`,
+          backgroundSize: "cover",
+        }}
+      >
+        <Search
+          search={search}
+          setSearch={setSearch}
+          handleSearch={handleSearch}
+          inputError={inputError}
+        />
+
+        {/* Location info */}
+        <div className="h-60 flex flex-col justify-center items-center text-center z-10">
+          {errorMessage ? (
+            <div>
+              <h1 className="text-6xl font-bold text-white font-serif">
+                City not found
+              </h1>
+            </div>
+          ) : weatherData ? (
+            <>
+              <div className="flex max-w-96 w-full justify-around items-center">
+                <p>Feels like {weatherData.main.feels_like} &deg;</p>
+                <span>
+                  <Image
+                    src={icon}
+                    alt="icon"
+                    className="size-auto font-semibold"
+                    width={100}
+                    height={100}
+                  />
+                </span>
+              </div>
+              <h1 className="text-6xl font-bold text-white font-serif">
+                {weatherData.name}, {weatherData.sys.country}
+              </h1>
+              <small className="mt-2 font-semibold tracking-wide text-sm">
+                {getCurrentDate(weatherData)}
+              </small>
+            </>
+          ) : (
+            <div>
+              <h2>Try searching a city</h2>
+            </div>
+          )}
+        </div>
+        {/* Weather details and Forecast */}
+        {/* Weather details card */}
+        <div className="m-auto flex w-screen flex-wrap text-center justify-around sm:flex-row">
+          <div className="w-10/12 h-auto mb-4 lg:w-2/5 rounded-3xl bg-gray-400 bg-clip-padding backdrop-filter backdrop-blur-sm bg-opacity-10 border border-gray-100">
+            <h2 className="mt-3 text-xl font-bold">Weather Details</h2>
+
+            {errorMessage ? null : weatherData ? (
+              <div className="flex flex-col justify-center w-11/12 mx-auto">
+                <div className="p-4 flex align-center justify-between">
+                  <p>Temp max</p>
+                  <p>{weatherData?.main?.temp_max} &deg;C</p>
+                </div>
+                <div className="p-4 flex align-center justify-between">
+                  <p>Temp min</p>
+                  <p>{weatherData?.main?.temp_min} &deg;C</p>
+                </div>
+                <div className="p-4 flex align-center justify-between">
+                  <p>Humidity</p>
+                  <p>{weatherData?.main?.humidity}%</p>
+                </div>
+                <div className="p-4 flex align-center justify-between">
+                  <p>Wind Speed</p>
+                  <p>
+                    {((weatherData?.wind?.speed * 3600) / 1000).toFixed(1)} km/h
+                  </p>
+                </div>
+              </div>
+            ) : (
+              ""
+            )}
+          </div>
+
+          {/* Forecast card */}
+          <div className="container w-10/12 h-auto mb-4 lg:w-2/5 rounded-3xl bg-gray-400 bg-clip-padding backdrop-filter backdrop-blur-sm bg-opacity-10 border border-gray-100">
+            <h2 className="mt-3 text-xl font-bold">Weather Forecast</h2>
+            <p className="flex justify-center mb-4">{forecast_date}</p>
+            <div className="flex justify-around w-11/12 m-auto relative">
+              {errorMessage
+                ? null
+                : weatherForecast?.list.map((item) => (
+                    <div key={item.dt_txt}>
+                      <p className="mx-2">
+                        {item.dt_txt.split(" ")[1].slice(0, 5)}
+                      </p>
+                      <p>{item.weather[0].main}</p>
+                      <img
+                        src={`https://openweathermap.org/img/wn/${item.weather[0].icon}.png`}
+                        alt="icon"
+                        className="m-auto"
+                      />
+                      <small className="capitalize flex mb-4 mx-2">
+                        {item.weather[0].description}
+                      </small>
+                    </div>
+                  ))}
+            </div>
+          </div>
         </div>
       </div>
-
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-full sm:before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-full sm:after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px] z-[-1]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800 hover:dark:bg-opacity-30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Explore starter templates for Next.js.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50 text-balance`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
+      {/* end of details and forecast */}
+    </section>
   );
 }
