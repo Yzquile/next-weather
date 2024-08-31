@@ -60,3 +60,10 @@ npm run dev
 
  **Design inspiration**
  - [Figma](https://www.figma.com/community/file/1300997022541611628/weather-web)
+
+
+
+## Demo
+
+Watch it live here: https://next-weather.onrender.com/
+
